@@ -3,4 +3,5 @@ Fast intro in Ethereum infra (very useful) is here: https://ethereum.org/en/whit
 An intro to Ethereum infra is here: https://ethereum.org/en/developers/docs/intro-to-ethereum/<br />
 Here is the main site: https://aave.com/ where crypto assets and its borrow/deposits rates can be found<br />
 Developer portal is here: https://docs.aave.com/developers/<br />
+Aave liquidation protocol is here: https://docs.aave.com/developers/guides/liquidations<br />
 An explanation about Aave liqudation process is here: https://medium.com/coinmonks/creating-a-liquidation-script-for-aave-defi-protocol-ef584ad87e8f<br />
