@@ -5,3 +5,5 @@ Here is the main site: https://aave.com/ where crypto assets and its borrow/depo
 Developer portal is here: https://docs.aave.com/developers/<br />
 Aave liquidation protocol is here: https://docs.aave.com/developers/guides/liquidations<br />
 An explanation about Aave liqudation process is here: https://medium.com/coinmonks/creating-a-liquidation-script-for-aave-defi-protocol-ef584ad87e8f<br />
+Aave flash loans an explanation is here: https://medium.com/aave/sneak-peek-at-flash-loans-f2b28a394d62<br />
+Etherium Full Stack env set up is here: https://www.freecodecamp.org/news/full-stack-ethereum-development/<br />
