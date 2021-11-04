@@ -8,8 +8,11 @@ from web3._utils.contracts import encode_abi
 
 from crypto_utils import convert_wei_to_eth
 from reserve_asset import CRYPTO_ASSET_ETH_ADDRESS
+from reserve_asset import convert_addr_in_crypto_asset
 
 
+'''V1 contract is here: https://github.com/aave/aave-protocol/blob/master/abi/LendingPool.json
+'''
 #Lending_Pool_V1_Address = '0x398eC7346DcD622eDc5ae82352F02bE94C62d119'
 #Lending_Pool_V1_ABI = json.load(open('C:/Users/yonic/repos/liquidator/abi/LendingPool_V1.json'))
 
@@ -19,14 +22,13 @@ Lending_Pool_V2_ABI = json.load(open('C:/Users/yonic/repos/liquidator/abi/Lendin
 #this is my test free account in Infura, 100,000 Requests/Day
 Infura_EndPoint = 'https://mainnet.infura.io/v3/fd3ac79f46ba4500be8e92da9632b476'
 
+
 '''Parse Borrowd event based on AAVE V1 protocol:
    https://docs.aave.com/developers/v/1.0/developing-on-aave/the-protocol/lendingpool#borrow-1
 '''
 def handle_borrow_event_V1(event_data):
     collateral_crypto_address = event_data['_reserve']
-    crypto_collatera_asset = 'not_known'
-    if collateral_crypto_address in CRYPTO_ASSET_ETH_ADDRESS.keys():
-        crypto_collatera_asset = CRYPTO_ASSET_ETH_ADDRESS[collateral_crypto_address]
+    crypto_collatera_asset = convert_addr_in_crypto_asset(collateral_crypto_address)
 
     #TODO: convert Wei to USD
     user_who_borrowed_address = event_data['_user']
@@ -73,19 +75,51 @@ def handle_borrow_event_V2(event_data):
                  user_who_borrowed_address,
                  on_BehalfOf_borrowed_address))
 
+    return convert_wei_to_eth(amount)
 
 
+def handle_liqudation_call_event_V2(event_data):
+    collateralAsset = event_data['collateralAsset']
+    debtAsset = event_data['debtAsset']
+    user = event_data['user']
+    debtToCover = event_data['debtToCover']
+    liquidatedCollateralAmount = event_data['liquidatedCollateralAmount']
+    liquidator = event_data['liquidator']
+    receiveAToken = event_data['receiveAToken']
 
-def fetch_events():
+    collateralAsset_name = convert_addr_in_crypto_asset(collateralAsset)
+    debtAsset_name  = convert_addr_in_crypto_asset(debtAsset)
+    debtToCover_eth = convert_wei_to_eth(debtToCover)
+    liquidatedCollateralAmount_eth = convert_wei_to_eth(liquidatedCollateralAmount)
+
+    print("LiquidationCall\n"
+          "collateralAsset_name:{}"
+          ",debtAsset_name:{},"
+          ",debtToCover_eth:{},"
+          ",liquidatedCollateralAmount_eth:{}"
+          ",user:{},liquidator:{}".
+          format(collateralAsset_name, debtAsset_name, debtToCover_eth,
+                 liquidatedCollateralAmount_eth, user, liquidator))
+
+    return liquidatedCollateralAmount_eth, liquidator
+
+'''Based on: https://github.com/aave/protocol-v2/blob/ice/mainnet-deployment-03-12-2020/contracts/interfaces/ILendingPool.sol
+'''
+def fetch_events(type):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
-    #from_block = 0 #Too many blocks!
-    from_block = 13511521-10000 #some block in the past!
+    from_block = 13333357 #2021-10-01 12:11:05
     to_block = 'latest'
     address = None
     topics = None
 
     contract = web3.eth.contract(address=Lending_Pool_V2_Address, abi=Lending_Pool_V2_ABI)
-    event = contract.events.Borrow
+    if type == 'Borrow':
+        event = contract.events.Borrow
+    elif type == 'LiquidationCall':
+        event = contract.events.LiquidationCall
+    else:
+        raise Exception('Not supported event type!')
+
     abi = event._get_event_abi()
     abi_codec = event.web3.codec
 
@@ -108,18 +142,43 @@ def fetch_events():
     logs = event.web3.eth.getLogs(event_filter_params)
 
     # Convert raw binary event data to easily manipulable Python objects
+    Stats = []
     for entry in logs:
         data = dict(get_event_data(abi_codec, abi, entry))
 
         block_number = data['blockNumber']
         address = data['address'] #Lending Pool Contract address
 
-        if data['event'] == 'Borrow':
-            handle_borrow_event_V2(event_data=dict(data['args']))
+        event_type = data['event']
+        if event_type == 'Borrow':
+            ret = handle_borrow_event_V2(event_data=dict(data['args']))
+        elif event_type == 'LiquidationCall':
+            ret = handle_liqudation_call_event_V2(event_data=dict(data['args']))
+
+        Stats.append(ret)
+
+    collected_eth_summary = 0.0
+    liquidator_accounts_eth = {}
+    liquidator_accounts_stat = {}
+    if type == 'LiquidationCall':
+        for collected_eth, liq_account in Stats:
+            collected_eth_summary += collected_eth
+            if liq_account in liquidator_accounts_stat.keys():
+                liquidator_accounts_eth[liq_account] += collected_eth
+                liquidator_accounts_stat[liq_account] +=1
+            else:
+                liquidator_accounts_eth[liq_account] = collected_eth
+                liquidator_accounts_stat[liq_account] =1
 
 
-'''V1 contract is here: https://github.com/aave/aave-protocol/blob/master/abi/LendingPool.json
-'''
+    print('Total collected eth:{}'.format(collected_eth_summary))
+    print('liquidator collected eth:{}'.format(liquidator_accounts_eth))
+    print('liquidator collected num:{}'.format(liquidator_accounts_stat))
+
+    #Accounts balance could be found here: https://etherscan.io/address
+    #Example - https://etherscan.io/address/0x3909336de913344701C6F096502d26208210b39F
+
+
 
 def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3dD6'):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))

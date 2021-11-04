@@ -15,3 +15,9 @@ CRYPTO_ASSET_ETH_ADDRESS = {
     #TODO: add more assets from the protocol
 }
 
+
+def convert_addr_in_crypto_asset(addr):
+    if addr in CRYPTO_ASSET_ETH_ADDRESS.keys():
+        return CRYPTO_ASSET_ETH_ADDRESS[addr]
+    else:
+        return "not_know"
