@@ -6,6 +6,7 @@ from web3._utils.events import get_event_data
 from web3._utils.filters import construct_event_filter_params
 from web3._utils.contracts import encode_abi
 
+from position import GlobalPos
 from crypto_utils import convert_wei_to_eth
 from reserve_asset import CRYPTO_ASSET_ETH_ADDRESS
 from reserve_asset import convert_addr_in_crypto_asset
@@ -78,7 +79,7 @@ def handle_borrow_event_V2(event_data):
     return convert_wei_to_eth(amount)
 
 
-def handle_liqudation_call_event_V2(event_data):
+def handle_liqudation_call_event_V2(event_data, err_handler):
     collateralAsset = event_data['collateralAsset']
     debtAsset = event_data['debtAsset']
     user = event_data['user']
@@ -89,25 +90,35 @@ def handle_liqudation_call_event_V2(event_data):
 
     collateralAsset_name = convert_addr_in_crypto_asset(collateralAsset)
     debtAsset_name  = convert_addr_in_crypto_asset(debtAsset)
-    debtToCover_eth = convert_wei_to_eth(debtToCover)
-    liquidatedCollateralAmount_eth = convert_wei_to_eth(liquidatedCollateralAmount)
+    debtToCover = convert_wei_to_eth(debtToCover)
+    liquidatedCollateralAmount = convert_wei_to_eth(liquidatedCollateralAmount)
+
+    if (collateralAsset_name=='not_know') :
+        if 'not_known_asset' in err_handler:
+            err_handler['not_known_asset'].append(collateralAsset)
+        else:
+            err_handler['not_known_asset'] = [collateralAsset]
+
+    print("Raw message:{}\n".format(event_data))
 
     print("LiquidationCall\n"
           "collateralAsset_name:{}"
-          ",debtAsset_name:{},"
-          ",debtToCover_eth:{},"
-          ",liquidatedCollateralAmount_eth:{}"
+          ",debtAsset_name:{}"
+          ",debtToCover:{}"
+          ",liquidatedCollateralAmount:{}"
           ",user:{},liquidator:{}".
-          format(collateralAsset_name, debtAsset_name, debtToCover_eth,
-                 liquidatedCollateralAmount_eth, user, liquidator))
+          format(collateralAsset_name, debtAsset_name, debtToCover,
+                 liquidatedCollateralAmount, user, liquidator))
 
-    return liquidatedCollateralAmount_eth, liquidator
+    return {'received':[collateralAsset_name, liquidatedCollateralAmount], 'paid':[debtAsset_name, debtToCover]}
 
 '''Based on: https://github.com/aave/protocol-v2/blob/ice/mainnet-deployment-03-12-2020/contracts/interfaces/ILendingPool.sol
 '''
 def fetch_events(type):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
-    from_block = 13333357 #2021-10-01 12:11:05
+    #from_block = 13333357 #2021-10-01 12:11:05
+    #from_block = 13556142 - 1000
+    from_block = 12933357 #Jul-31-2021
     to_block = 'latest'
     address = None
     topics = None
@@ -142,42 +153,37 @@ def fetch_events(type):
     logs = event.web3.eth.getLogs(event_filter_params)
 
     # Convert raw binary event data to easily manipulable Python objects
-    Stats = []
+    err_handler = {}
+    pos = GlobalPos()
+    transactions = set()
     for entry in logs:
         data = dict(get_event_data(abi_codec, abi, entry))
 
         block_number = data['blockNumber']
         address = data['address'] #Lending Pool Contract address
+        transaction_hash = data['transactionHash'].hex()
 
-        event_type = data['event']
-        if event_type == 'Borrow':
-            ret = handle_borrow_event_V2(event_data=dict(data['args']))
-        elif event_type == 'LiquidationCall':
-            ret = handle_liqudation_call_event_V2(event_data=dict(data['args']))
+        '''Avoid having handle transaction multiple times'''
+        if transaction_hash not in transactions:
+            transactions.add(transaction_hash)
+            print('##### block_number:{}, transaction:{} #####\n'.format(block_number,transaction_hash))
+            event_type = data['event']
+            if event_type == 'Borrow':
+                ret = handle_borrow_event_V2(event_data=dict(data['args']))
+            elif event_type == 'LiquidationCall':
+                ret = handle_liqudation_call_event_V2(event_data=dict(data['args']), err_handler=err_handler)
+                asset, amount = ret['received']
+                pos.increase_pos(asset, amount)
 
-        Stats.append(ret)
+                asset, amount = ret['paid']
+                pos.decrease_pos(asset, amount)
 
-    collected_eth_summary = 0.0
-    liquidator_accounts_eth = {}
-    liquidator_accounts_stat = {}
-    if type == 'LiquidationCall':
-        for collected_eth, liq_account in Stats:
-            collected_eth_summary += collected_eth
-            if liq_account in liquidator_accounts_stat.keys():
-                liquidator_accounts_eth[liq_account] += collected_eth
-                liquidator_accounts_stat[liq_account] +=1
-            else:
-                liquidator_accounts_eth[liq_account] = collected_eth
-                liquidator_accounts_stat[liq_account] =1
-
-
-    print('Total collected eth:{}'.format(collected_eth_summary))
-    print('liquidator collected eth:{}'.format(liquidator_accounts_eth))
-    print('liquidator collected num:{}'.format(liquidator_accounts_stat))
-
-    #Accounts balance could be found here: https://etherscan.io/address
-    #Example - https://etherscan.io/address/0x3909336de913344701C6F096502d26208210b39F
-
+    print(pos.get_pos())
+    print('global pos summary in USD:{}'.format(pos.pos_sum_in_usd()))
+    '''Assuming average transaction about 500$, according to random check on https://etherscan.io/tx
+       based on the executed transactions 
+    '''
+    print('Num of liqidations:{}, Estimated transaction fees:{}'.format(len(transactions), len(transactions) * 500.0))
 
 
 def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3dD6'):
@@ -186,7 +192,6 @@ def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3d
     ret = contract.functions.getUserAccountData(account).call()
     print(ret)
     pass
-
 
 
 
