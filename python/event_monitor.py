@@ -1,13 +1,15 @@
 import json
 import datetime
+import pandas as pd
 from web3 import Web3
 from web3._utils.abi import get_constructor_abi, merge_args_and_kwargs
 from web3._utils.events import get_event_data
 from web3._utils.filters import construct_event_filter_params
 from web3._utils.contracts import encode_abi
 
-from position import GlobalPos
+from reserve_asset import get_crypto_asset_usd_price
 from crypto_utils import convert_wei_to_eth
+from crypto_utils import convert_decimal_to_float
 from reserve_asset import CRYPTO_ASSET_ETH_ADDRESS
 from reserve_asset import convert_addr_in_crypto_asset
 
@@ -90,8 +92,8 @@ def handle_liqudation_call_event_V2(event_data, err_handler):
 
     collateralAsset_name = convert_addr_in_crypto_asset(collateralAsset)
     debtAsset_name  = convert_addr_in_crypto_asset(debtAsset)
-    debtToCover = convert_wei_to_eth(debtToCover)
-    liquidatedCollateralAmount = convert_wei_to_eth(liquidatedCollateralAmount)
+    debtToCover = convert_decimal_to_float(debtAsset_name, debtToCover)
+    liquidatedCollateralAmount = convert_decimal_to_float(collateralAsset_name, liquidatedCollateralAmount)
 
     if (collateralAsset_name=='not_know') :
         if 'not_known_asset' in err_handler:
@@ -110,15 +112,13 @@ def handle_liqudation_call_event_V2(event_data, err_handler):
           format(collateralAsset_name, debtAsset_name, debtToCover,
                  liquidatedCollateralAmount, user, liquidator))
 
-    return {'received':[collateralAsset_name, liquidatedCollateralAmount], 'paid':[debtAsset_name, debtToCover]}
+    return {'received':[collateralAsset_name, liquidatedCollateralAmount], 'paid':[debtAsset_name, debtToCover], 'liquidator':liquidator}
 
 '''Based on: https://github.com/aave/protocol-v2/blob/ice/mainnet-deployment-03-12-2020/contracts/interfaces/ILendingPool.sol
 '''
 def fetch_events(type):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
-    #from_block = 13333357 #2021-10-01 12:11:05
-    #from_block = 13556142 - 1000
-    from_block = 12933357 #Jul-31-2021
+    from_block = 13333357 #2021-10-01 12:11:05
     to_block = 'latest'
     address = None
     topics = None
@@ -154,8 +154,14 @@ def fetch_events(type):
 
     # Convert raw binary event data to easily manipulable Python objects
     err_handler = {}
-    pos = GlobalPos()
     transactions = set()
+    Transaction = []
+    Balance = []
+    Liquidator = []
+    DebtAsset = []
+    DebtAmountCovered = []
+    ColAsset = []
+    ColAmountCollected = []
     for entry in logs:
         data = dict(get_event_data(abi_codec, abi, entry))
 
@@ -173,17 +179,34 @@ def fetch_events(type):
             elif event_type == 'LiquidationCall':
                 ret = handle_liqudation_call_event_V2(event_data=dict(data['args']), err_handler=err_handler)
                 asset, amount = ret['received']
-                pos.increase_pos(asset, amount)
+                received = amount * get_crypto_asset_usd_price(asset)
+                ColAsset.append(asset)
+                ColAmountCollected.append(amount)
 
                 asset, amount = ret['paid']
-                pos.decrease_pos(asset, amount)
+                paid = amount * get_crypto_asset_usd_price(asset)
+                DebtAsset.append(asset)
+                DebtAmountCovered.append(amount)
 
-    print(pos.get_pos())
-    print('global pos summary in USD:{}'.format(pos.pos_sum_in_usd()))
-    '''Assuming average transaction about 500$, according to random check on https://etherscan.io/tx
-       based on the executed transactions 
-    '''
-    print('Num of liqidations:{}, Estimated transaction fees:{}'.format(len(transactions), len(transactions) * 500.0))
+                Transaction.append(transaction_hash)
+
+                '''Without Gas fee!'''
+                Balance.append(received - paid)
+
+                Liquidator.append(ret['liquidator'])
+
+    df = pd.DataFrame({'transaction': Transaction,
+                       'balance': Balance,
+                       'liquidator': Liquidator,
+                       'col_asset': ColAsset,
+                       'col_collected': ColAmountCollected,
+                       'debt_asset': DebtAsset,
+                       'debt_covered': DebtAmountCovered})
+
+    df.to_csv('liquidator_balance.csv')
+
+    pass
+
 
 
 def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3dD6'):

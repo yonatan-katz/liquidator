@@ -55,7 +55,7 @@ CRYPTO_ASSETS_VALUES_IN_USD = {
     'USDC': 1.0,
     'LINK': 33.29,
     'USDT': 1.0,
-    'WBTC': 62.171,
+    'WBTC': 60700.0,
     'AAVE': 341.60,
     'DAI': 1.0,
     'BAL': 27.3,

@@ -2,3 +2,8 @@
 
 Accounts balance could be found here: https://etherscan.io/address
 Example - https://etherscan.io/address/0x3909336de913344701C6F096502d26208210b39F
+
+Transaction can be checked here: https://etherscan.io/tx/
+For example: https://etherscan.io/tx/0x1b19c510723125569b3191a762aeffbbb6c3c3a5933dae28a6b30857a2a45f55
+
+
