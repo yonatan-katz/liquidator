@@ -65,7 +65,7 @@ CRYPTO_ASSETS_VALUES_IN_USD = {
     'CRV': 4.15,
     'UNI': 25.45,
     'AMPL': 1.59,
-    'MKR': 2.927,
+    'MKR': 2927,
     'MANA': 2.5216,
     'BAT': 1.02,
     'DeFiPulse': 379.93,
