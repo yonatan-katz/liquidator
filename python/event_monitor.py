@@ -8,10 +8,14 @@ from web3._utils.filters import construct_event_filter_params
 from web3._utils.contracts import encode_abi
 
 from reserve_asset import get_crypto_asset_usd_price
-from crypto_utils import convert_wei_to_eth
-from crypto_utils import convert_decimal_to_float
+from reserve_asset import split_user_loan_deposit_bitmask
+from reserve_asset import split_asset_config_bitmask
 from reserve_asset import CRYPTO_ASSET_ETH_ADDRESS
 from reserve_asset import convert_addr_in_crypto_asset
+from crypto_utils import convert_wei_to_eth
+from crypto_utils import convert_decimal_to_float
+
+
 
 
 '''V1 contract is here: https://github.com/aave/aave-protocol/blob/master/abi/LendingPool.json
@@ -227,8 +231,45 @@ def fetch_events(type):
 def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3dD6'):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
     contract = web3.eth.contract(address=Lending_Pool_V2_Address, abi=Lending_Pool_V2_ABI)
+
+    '''Get assets index'''
+    reserve_to_index = []
+    ret = contract.functions.getReservesList().call()
+    for i in range(len(ret)):
+        print('reserved asset:',convert_addr_in_crypto_asset(ret[i]))
+        reserve_to_index.append(ret[i])
+
+    '''Get user asset config'''
+    ret = contract.functions.getUserConfiguration(account).call()
+    s = split_user_loan_deposit_bitmask(ret[0])
+    for k in s.keys():
+        is_col, is_borrowed = s[k]
+        asset_addr = reserve_to_index[k]
+        asset_name = convert_addr_in_crypto_asset(asset_addr)
+        print('asset:{}, is_col:{}, is_borrowed:{}'.format(asset_name, is_col, is_borrowed))
+    print('getUserConfiguration:{}'.format(ret))
+
+    '''Get asset config'''
+    for asset_addr in reserve_to_index:
+        ret = contract.functions.getConfiguration(asset_addr).call()
+        print("asset:{}, config:{}".format(convert_addr_in_crypto_asset(asset_addr), ret[0]))
+        split_asset_config_bitmask(ret[0])
+    ###
     ret = contract.functions.getUserAccountData(account).call()
-    print(ret)
+    total_col_in_eth = convert_wei_to_eth(ret[0])
+    total_debt_in_eth = convert_wei_to_eth(ret[1])
+    available_borrows_in_eth = convert_wei_to_eth(ret[2])
+    current_liquidation_threshold = ret[3]
+    ltv = ret[4]
+    healthFactor = ret[5]/1e18
+    print('total_col_in_eth:{},total_debt_in_eth:{},available_borrows_in_eth:{},'
+          'current_liquidation_threshold:{},ltv:{},healthFactor:{}'.
+          format(total_col_in_eth,
+                 total_debt_in_eth,
+                 available_borrows_in_eth,
+                 current_liquidation_threshold,
+                 ltv,
+                 healthFactor))
     pass
 
 

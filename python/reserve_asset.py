@@ -34,10 +34,45 @@ CRYPTO_ASSET_ETH_ADDRESS = {
     '0xD46bA6D942050d489DBd938a2C909A5d5039A161' : 'AMPL',
     '0x1494CA1F11D487c2bBe4543E90080AeBa4BA3C2b' : 'DeFiPulse',
     '0x8E870D67F660D95d5be530380D0eC0bd388289E1' : 'USDP',
-    '0x853d955aCEf822Db058eb8505911ED77F175b99e' : 'FRAX'
+    '0x853d955aCEf822Db058eb8505911ED77F175b99e' : 'FRAX',
+    '0x956F47F50A910163D8BF957Cf5846D573E7f87CA' : 'FEI'
 
     #TODO: add more assets from the protocol
 }
+'''split binary mask to the borrowed, collateral assets according to:
+   https://docs.aave.com/developers/the-core-protocol/lendingpool#getconfiguration 
+'''
+def split_user_loan_deposit_bitmask(bitmask):
+    bitmask_ascii = str(bin(bitmask))
+    asset_index = 0
+    S = {}
+    print(bitmask_ascii)
+    for i in range(len(bitmask_ascii)-1,2,-2):
+        is_borrowed = int(bitmask_ascii[i])
+        is_col = int(bitmask_ascii[i-1])
+        S[asset_index] = (is_col, is_borrowed)
+        asset_index += 1
+    return S
+
+'''split reserve asset config bitmask based on
+   https://github.com/aave/protocol-v2/blob/master/aave-v2-whitepaper.pdf,
+   chapter 4.4
+'''
+def split_asset_config_bitmask(bitmask):
+    bitmask_ascii = str(bin(bitmask))
+    print(bitmask_ascii)
+    ltv = int(bitmask_ascii[-15:], 2) / 100.0 #maximum ltv of the asset
+    liq_threshold = int(bitmask_ascii[-31:-16], 2) / 100.0
+    liq_bonus = int(bitmask_ascii[-47:-32], 2) / 100.0
+    decimals = int(bitmask_ascii[-55:-48], 2)
+    is_active = int(bitmask_ascii[-56], 2)
+    is_freezed = int(bitmask_ascii[-57], 2)
+    is_borrowing_enabled = int(bitmask_ascii[-58], 2)
+    stable_borrowing_enabled = int(bitmask_ascii[-59], 2)
+    reserved = int(bitmask_ascii[-64:-60], 2)
+    reserved_factor = int(bitmask_ascii[-80:-65], 2)
+    pass
+
 
 
 
@@ -84,3 +119,7 @@ def get_crypto_asset_usd_price(crypto_asset):
         return CRYPTO_ASSETS_VALUES_IN_USD[crypto_asset]
 
     raise Exception('Cannot convert to usd crypto asset:{}'.formatg(crypto_asset))
+
+
+if __name__ == '__main__':
+    split_asset_config_bitmask(36894427193683303209816)
