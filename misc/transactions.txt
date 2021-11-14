@@ -30,3 +30,20 @@ Most rewarded transactions:
 0x9559dbf768779351b9dbecbd23a2b28d5052901f33e71908ea8e6caa14b7913f - 94,766$ pos in block 0/168  #Duplicated transaction!!!!
 
 https://etherscan.io/address/0x3909336de913344701c6f096502d26208210b39f - liqiudation bot! Liqiudate small positions on AAve and Compound!
+
+0xf2efab411d70c7b7951d5e4f1567b70ec6cb2f912d04d2ea46cd4760b23c1b6b not flash bot transaction!!!
+
+0xe8204fe288b7f12717882f139772ebc882515f166a5032b77bfd0c01b0126080 - liquidation with flash loan!!!
+0xad84be4370c5febe86cf533a38a816b3f2c1036e40d3636fcb37eae37952fc4d - liquidation with flash loan!!!
+
+estimation GAS usage by 0x3909336de913344701C6F096502d26208210b39F BOT:
+Market,Amount GAS,Status,Trnx,UseFlashBot
+AAVE,410189,OK,0x9a30587a5164a4d469f73d2a617e9d48eba7a25490c5b8cfb442e8b9efd346aa,False
+AAVE,70443,Failed,0x263aa54f6531db3659d33364648231c604a480a3b7a12602a8675c1834a44fa8,False
+AAVE,410189,OK,0x1f910661c5b8375e2684daa0568f849113843c1a4e5ba4c2b03c1257ab852d7d,False
+AAVE,485171,OK,0x2a0aabd99fbfcdeaeed171213de205564bc801e8be55d8bb1e4190c16b01b350,True
+AAVE,568363,OK,0xd0440616f676b1f459a9ec26d8ac848966a23430a86f3aa0e9049c31798a9d45,True
+AAVE,465121,OK,0xef7561241c8e7dce8a6309c3f30e115ee5661f950e961cdafa3a9df2150541e6,False,
+AAVE,70383,Failed,0xd0c645917002a889668bce7888b6025ff85fa2adedc32503822079eb5f6e1af8,False
+
+

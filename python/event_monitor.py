@@ -128,6 +128,8 @@ def fetch_events(type):
         event = contract.events.Borrow
     elif type == 'LiquidationCall':
         event = contract.events.LiquidationCall
+    elif type == 'FlashLoan':
+        event = contract.events.FlashLoan
     else:
         raise Exception('Not supported event type!')
 
@@ -162,6 +164,7 @@ def fetch_events(type):
     DebtAmountCovered = []
     ColAsset = []
     ColAmountCollected = []
+    Block = []
     for entry in logs:
         data = dict(get_event_data(abi_codec, abi, entry))
 
@@ -172,6 +175,7 @@ def fetch_events(type):
         '''Avoid having handle transaction multiple times'''
         if transaction_hash not in transactions:
             transactions.add(transaction_hash)
+            Block.append(block_number)
             print('##### block_number:{}, transaction:{} #####\n'.format(block_number,transaction_hash))
             event_type = data['event']
             if event_type == 'Borrow':
@@ -189,21 +193,32 @@ def fetch_events(type):
                 DebtAmountCovered.append(amount)
 
                 Transaction.append(transaction_hash)
+                tx_receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
+                print(tx_receipt)
 
                 '''Without Gas fee!'''
                 Balance.append(received - paid)
 
                 Liquidator.append(ret['liquidator'])
+            elif event_type == 'FlashLoan':
+                Transaction.append(transaction_hash)
+                pass
 
-    df = pd.DataFrame({'transaction': Transaction,
-                       'balance': Balance,
-                       'liquidator': Liquidator,
-                       'col_asset': ColAsset,
-                       'col_collected': ColAmountCollected,
-                       'debt_asset': DebtAsset,
-                       'debt_covered': DebtAmountCovered})
+    if type == 'LiquidationCall':
+        df = pd.DataFrame({'transaction': Transaction,
+                           'balance': Balance,
+                           'liquidator': Liquidator,
+                           'col_asset': ColAsset,
+                           'col_collected': ColAmountCollected,
+                           'debt_asset': DebtAsset,
+                           'debt_covered': DebtAmountCovered,
+                           'block':Block})
 
-    df.to_csv('liquidator_balance.csv')
+    if type == 'FlashLoan':
+        df = pd.DataFrame({'transaction': Transaction, 'block':Block})
+
+
+    df.to_csv('{}.csv'.format(type))
 
     pass
 
