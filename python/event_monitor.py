@@ -16,19 +16,7 @@ from crypto_utils import convert_wei_to_eth
 from crypto_utils import convert_decimal_to_float
 
 
-
-
-'''V1 contract is here: https://github.com/aave/aave-protocol/blob/master/abi/LendingPool.json
-'''
-#Lending_Pool_V1_Address = '0x398eC7346DcD622eDc5ae82352F02bE94C62d119'
-#Lending_Pool_V1_ABI = json.load(open('C:/Users/yonic/repos/liquidator/abi/LendingPool_V1.json'))
-
-Lending_Pool_V2_Address = '0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9'
-Lending_Pool_V2_ABI = json.load(open('C:/Users/yonic/repos/liquidator/abi/LendingPool_V2.json'))
-
-#this is my test free account in Infura, 100,000 Requests/Day
-Infura_EndPoint = 'https://mainnet.infura.io/v3/fd3ac79f46ba4500be8e92da9632b476'
-
+from config import *
 
 '''Parse Borrowd event based on AAVE V1 protocol:
    https://docs.aave.com/developers/v/1.0/developing-on-aave/the-protocol/lendingpool#borrow-1
@@ -122,7 +110,8 @@ def handle_liqudation_call_event_V2(event_data, err_handler):
 '''
 def fetch_events(type):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
-    from_block = 13333357 #2021-10-01 12:11:05
+    #from_block = 13333357 #2021-10-01 12:11:05
+    from_block = 13640492 - 4000
     to_block = 'latest'
     address = None
     topics = None
@@ -139,6 +128,7 @@ def fetch_events(type):
 
     abi = event._get_event_abi()
     abi_codec = event.web3.codec
+
 
     # Set up any indexed event filters if needed
     argument_filters = dict()
@@ -179,10 +169,11 @@ def fetch_events(type):
         '''Avoid having handle transaction multiple times'''
         if transaction_hash not in transactions:
             transactions.add(transaction_hash)
-            Block.append(block_number)
+
             print('##### block_number:{}, transaction:{} #####\n'.format(block_number,transaction_hash))
             event_type = data['event']
             if event_type == 'Borrow':
+                Block.append(block_number)
                 ret = handle_borrow_event_V2(event_data=dict(data['args']))
             elif event_type == 'LiquidationCall':
                 ret = handle_liqudation_call_event_V2(event_data=dict(data['args']), err_handler=err_handler)
@@ -202,8 +193,8 @@ def fetch_events(type):
 
                 '''Without Gas fee!'''
                 Balance.append(received - paid)
-
                 Liquidator.append(ret['liquidator'])
+                Block.append(block_number)
             elif event_type == 'FlashLoan':
                 Transaction.append(transaction_hash)
                 pass
@@ -259,8 +250,8 @@ def call_getUserAccountData_V2(account='0x8d30e4b4C8D461d99Ee3FD67B3f7f0Ddaf9d3d
     total_col_in_eth = convert_wei_to_eth(ret[0])
     total_debt_in_eth = convert_wei_to_eth(ret[1])
     available_borrows_in_eth = convert_wei_to_eth(ret[2])
-    current_liquidation_threshold = ret[3]
-    ltv = ret[4]
+    current_liquidation_threshold = ret[3]/100.0
+    ltv = ret[4] /100.0
     healthFactor = ret[5]/1e18
     print('total_col_in_eth:{},total_debt_in_eth:{},available_borrows_in_eth:{},'
           'current_liquidation_threshold:{},ltv:{},healthFactor:{}'.

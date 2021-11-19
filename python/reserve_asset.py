@@ -54,13 +54,26 @@ def split_user_loan_deposit_bitmask(bitmask):
         asset_index += 1
     return S
 
+
+
+def merge_with_default_bitmask(ascii_bitmsak):
+    ascii_bitmsak = list(ascii_bitmsak)[2:]
+    default_bitmask = list(str(bin(2 ** 255))[2:])
+    default_bitmask[-len(ascii_bitmsak):-1] = ascii_bitmsak
+    default_bitmask[0] = '0'
+    return "".join(default_bitmask)
+
+
+
 '''split reserve asset config bitmask based on
    https://github.com/aave/protocol-v2/blob/master/aave-v2-whitepaper.pdf,
    chapter 4.4
 '''
 def split_asset_config_bitmask(bitmask):
+
     bitmask_ascii = str(bin(bitmask))
     print(bitmask_ascii)
+    bitmask_ascii = merge_with_default_bitmask(bitmask_ascii)
     ltv = int(bitmask_ascii[-15:], 2) / 100.0 #maximum ltv of the asset
     liq_threshold = int(bitmask_ascii[-31:-16], 2) / 100.0
     liq_bonus = int(bitmask_ascii[-47:-32], 2) / 100.0
