@@ -2,7 +2,7 @@
 Crypto assets addresses from:
 https://docs.aave.com/developers/v/1.0/deployed-contracts/deployed-contract-instances#reserves-assets
 '''
-CRYPTO_ASSET_ETH_ADDRESS = {
+CRYPTO_ASSET_ADDRESS_TO_NAME = {
     '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : 'ETH',
     '0x6B175474E89094C44Da98b954EedeAC495271d0F' : 'DAI',
     '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' : 'USDC',
@@ -39,6 +39,9 @@ CRYPTO_ASSET_ETH_ADDRESS = {
 
     #TODO: add more assets from the protocol
 }
+
+CRYPTO_ASSET_NAME_TO_ADDRESS = {value:key for key, value in CRYPTO_ASSET_ADDRESS_TO_NAME.items()}
+
 '''split binary mask to the borrowed, collateral assets according to:
    https://docs.aave.com/developers/the-core-protocol/lendingpool#getconfiguration 
 '''
@@ -59,7 +62,7 @@ def split_user_loan_deposit_bitmask(bitmask):
 def merge_with_default_bitmask(ascii_bitmsak):
     ascii_bitmsak = list(ascii_bitmsak)[2:]
     default_bitmask = list(str(bin(2 ** 255))[2:])
-    default_bitmask[-len(ascii_bitmsak):-1] = ascii_bitmsak
+    default_bitmask[-len(ascii_bitmsak):] = ascii_bitmsak
     default_bitmask[0] = '0'
     return "".join(default_bitmask)
 
@@ -70,11 +73,13 @@ def merge_with_default_bitmask(ascii_bitmsak):
    chapter 4.4
 '''
 def split_asset_config_bitmask(bitmask):
-
     bitmask_ascii = str(bin(bitmask))
+    ltv = int(bitmask_ascii[-15:], 2) / 100.0  # maximum ltv of the asset
+    print(ltv)
     print(bitmask_ascii)
     bitmask_ascii = merge_with_default_bitmask(bitmask_ascii)
     ltv = int(bitmask_ascii[-15:], 2) / 100.0 #maximum ltv of the asset
+    print(ltv)
     liq_threshold = int(bitmask_ascii[-31:-16], 2) / 100.0
     liq_bonus = int(bitmask_ascii[-47:-32], 2) / 100.0
     decimals = int(bitmask_ascii[-55:-48], 2)
@@ -84,17 +89,21 @@ def split_asset_config_bitmask(bitmask):
     stable_borrowing_enabled = int(bitmask_ascii[-59], 2)
     reserved = int(bitmask_ascii[-64:-60], 2)
     reserved_factor = int(bitmask_ascii[-80:-65], 2)
-    pass
-
+    return ltv, liq_threshold, liq_bonus, decimals
 
 
 
 def convert_addr_in_crypto_asset(addr):
-    if addr in CRYPTO_ASSET_ETH_ADDRESS.keys():
-        return CRYPTO_ASSET_ETH_ADDRESS[addr]
+    if addr in CRYPTO_ASSET_ADDRESS_TO_NAME.keys():
+        return CRYPTO_ASSET_ADDRESS_TO_NAME[addr]
     else:
-        return "not_know"
+        raise Exception('Not known addr:{}'.format(addr))
 
+def convert_crypto_asset_to_addr(name):
+    if name in CRYPTO_ASSET_NAME_TO_ADDRESS:
+        return CRYPTO_ASSET_NAME_TO_ADDRESSp[name]
+    else:
+         raise Exception('Not known name:{}'.format(name))
 
 '''Rougly crypto asset estimation based on google on 2021/11/05
 '''

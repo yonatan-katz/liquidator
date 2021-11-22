@@ -1,5 +1,6 @@
 import os
 import datetime
+import numpy as np
 import pandas as pd
 import pickle
 import glob
@@ -8,10 +9,14 @@ from web3._utils.abi import get_constructor_abi, merge_args_and_kwargs
 from web3._utils.events import get_event_data
 from web3._utils.filters import construct_event_filter_params
 
+from reserve_asset import convert_addr_in_crypto_asset
+from reserve_asset import split_user_loan_deposit_bitmask
+from reserve_asset import split_asset_config_bitmask
+
 import config
+from config import CACHE_FOLDER
 import aave_events
 
-CACHE_FOLDER = 'C:/Users/yonic/junk/liquidator/cache'
 
 def make_event_handler(event, from_block, to_block):
     abi = event._get_event_abi()
@@ -53,9 +58,165 @@ def load_from_cache():
 
     return cached_data, last_cached_block
 
-def load_debt_account_from_cache():
+def wrapper_getUserAccountData(user_address):
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address,
+                                 abi=config.Lending_Pool_V2_ABI)
+    user_account = []
+    for user in user_address:
+        S = {}
+        ret = contract.functions.getUserAccountData(user).call()
+        S['col'] = [ret[0] / 1e18]
+        S['debt'] = ret[1] / 1e18
+        S['available'] = ret[2] / 1e18
+        S['liquidation_threshold'] = ret[3] / 100.0
+        S['ltv'] = ret[4] / 100.0
+        S['healthFactor'] = ret[5] / 1e18
+        S['user'] = user
+        df = pd.DataFrame(S)
+        user_account.append(df)
+
+    df = pd.concat(user_account)
+    return df
+
+'''Get assets index'''
+def wrapper_getReservesList():
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
+    reserve_to_index = []
+    ret = contract.functions.getReservesList().call()
+    for i in range(len(ret)):
+        #print('reserved asset:',convert_addr_in_crypto_asset(ret[i]))
+        reserve_to_index.append(ret[i])
+
+    return reserve_to_index
+'''Call getConfiguration, input args:
+   @reserve_to_index - list of the AAVE reserve asset from getReservesList() function!
+   Returns reserve asset configuratios
+'''
+def wrapper_getConfiguration(reserve_to_index):
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
+    S = {}
+    c = []
+    for asset_addr in reserve_to_index:
+        ret = contract.functions.getConfiguration(asset_addr).call()
+        print("asset:{}, config:{}".format(convert_addr_in_crypto_asset(asset_addr), ret[0]))
+        ltv, liq_threshold, liq_bonus, decimals = split_asset_config_bitmask(ret[0])
+        asset_name = convert_addr_in_crypto_asset(asset_addr)
+        S['name'] = [asset_name]
+        S['addr'] = [asset_addr]
+        S['ltv'] = [ltv]
+        S['liq_threshold'] = [liq_threshold]
+        S['liq_bonus'] = [liq_bonus]
+        S['decimals'] = [decimals]
+        df = pd.DataFrame(S)
+        c.append(df)
+    c = pd.concat(c)
+    return c
+
+''' Call getUserConfiguration, input args:
+    @user AAVE protocol user address
+    @reserve_to_index - list of the AAVE reserve asset from getReservesList() function!    
+    Returns list of the borrowed and collateral assets for the user
+    https://docs.aave.com/developers/the-core-protocol/lendingpool
+'''
+def wrapper_getUserConfiguration(user, reserve_to_index):
+    '''Get user asset config'''
+    borrowed = []
+    collateral = []
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
+    ret = contract.functions.getUserConfiguration(user).call()
+    s = split_user_loan_deposit_bitmask(ret[0])
+    for k in s.keys():
+        is_col, is_borrowed = s[k]
+        asset_addr = reserve_to_index[k]
+        asset_name = convert_addr_in_crypto_asset(asset_addr)
+        if is_col:
+            collateral.append(asset_name)
+        if is_borrowed:
+            borrowed.append(asset_name)
+
+    return collateral, borrowed
+
+def query_liquidation_call_event(from_block, to_block='latest'):
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
+    event_name = 'LiquidationCall'
+    event_handler = aave_events.handle_liquidation_call
+    event = getattr(contract.events, event_name)
+    event_filter_params, abi, abi_codec = make_event_handler(event=event,
+        from_block=from_block, to_block=to_block)
+    logs = contract.events.Borrow.web3.eth.getLogs(event_filter_params)
+    collected_events = []
+    for entry in logs:
+        data = dict(get_event_data(abi_codec, abi, entry))
+        block_number = data['blockNumber']
+        transaction_hash = data['transactionHash'].hex()
+        d = event_handler(event_data=dict(data['args']))
+        d['block_number'] = [block_number]
+        d['transaction_hash'] = [transaction_hash]
+        df = pd.DataFrame(d)
+        collected_events.append(df)
+
+    if len(collected_events) > 0:
+        collected_events = pd.concat(collected_events)
+    else:
+        collected_events = None
+
+    return collected_events
+
+
+
+def query_user_health_factor_from_cache():
     cached_data, last_cached_block = load_from_cache()
+    borrow  = cached_data['Borrow']
+    user_address = borrow.user.unique()
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address,
+                                 abi=config.Lending_Pool_V2_ABI)
+    user_account = []
+    t1 = datetime.datetime.now()
+    for user in user_address:
+        S = {}
+        ret = contract.functions.getUserAccountData(user).call()
+        S['col'] = [ret[0]/1e18]
+        S['debt'] = [ret[1]/1e18]
+        S['available'] = [ret[2]/1e18]
+        S['liquidation_threshold'] = [ret[3] / 100.0]
+        S['ltv'] = [ret[4] / 100.0]
+        S['healthFactor'] = [ret[5] / 1e18]
+        S['user'] = [user]
+
+        df = pd.DataFrame(S)
+        user_account.append(df)
+    t2 = datetime.datetime.now()
+    print('time:{}'.format((t2 - t1).total_seconds()))
+    user_account = pd.concat(user_account)
+    now = datetime.datetime.now()
+    user_account.to_hdf('{}/user_data_{}_{}.h5'.format(CACHE_FOLDER, now.strftime("%Y%m%d_%H%M%S"), last_cached_block),
+                        key='user_account')
     pass
+
+''' Cached health factor over all cached borrowd accounts
+    date and time is when getUserAccountData() called,
+    latest_cached_block is when account list is created!
+'''
+def load_latest_health_factor_from_cache():
+    S = {}
+    for fname in glob.glob('{}/user_data_*.h5'.format(CACHE_FOLDER)):
+        date = int(fname.split('_')[-3])
+        time = int(fname.split('_')[-2])
+        block = int(fname.split('_')[-1].split('.')[0])
+        S[block] = (fname, date, time)
+
+    latest_cached_block = sorted(S.keys())[-1]
+    fname = S[latest_cached_block][0]
+    date = S[latest_cached_block][1]
+    time = S[latest_cached_block][2]
+    df = pd.read_hdf(fname, key='user_account')
+    return df, latest_cached_block, date, time
 
 
 
@@ -115,5 +276,7 @@ def update_cache():
     pass
 
 if __name__ == '__main__':
-    update_cache()
+    #update_cache()
+    query_user_health_factor_from_cache()
+
 

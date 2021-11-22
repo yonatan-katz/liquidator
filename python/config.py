@@ -10,3 +10,5 @@ Lending_Pool_V2_ABI = json.load(open('C:/Users/yonic/repos/liquidator/abi/Lendin
 
 #this is my test free account in Infura, 100,000 Requests/Day
 Infura_EndPoint = 'https://mainnet.infura.io/v3/fd3ac79f46ba4500be8e92da9632b476'
+
+CACHE_FOLDER = 'C:/Users/yonic/junk/liquidator/cache'
