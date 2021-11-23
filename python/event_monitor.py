@@ -10,11 +10,10 @@ from web3._utils.contracts import encode_abi
 from reserve_asset import get_crypto_asset_usd_price
 from reserve_asset import split_user_loan_deposit_bitmask
 from reserve_asset import split_asset_config_bitmask
-from reserve_asset import CRYPTO_ASSET_ETH_ADDRESS
+from reserve_asset import CRYPTO_ASSET_ADDRESS_TO_NAME
 from reserve_asset import convert_addr_in_crypto_asset
 from crypto_utils import convert_wei_to_eth
 from crypto_utils import convert_decimal_to_float
-
 
 from config import *
 
@@ -49,8 +48,8 @@ def handle_borrow_event_V1(event_data):
 def handle_borrow_event_V2(event_data):
     collateral_crypto_address = event_data['reserve']
     crypto_collatera_asset = 'not_known'
-    if collateral_crypto_address in CRYPTO_ASSET_ETH_ADDRESS.keys():
-        crypto_collatera_asset = CRYPTO_ASSET_ETH_ADDRESS[collateral_crypto_address]
+    if collateral_crypto_address in CRYPTO_ASSET_ADDRESS_TO_NAME.keys():
+        crypto_collatera_asset = CRYPTO_ASSET_ADDRESS_TO_NAME[collateral_crypto_address]
 
     #TODO: convert Wei to USD
     on_BehalfOf_borrowed_address = event_data['onBehalfOf']
@@ -104,14 +103,14 @@ def handle_liqudation_call_event_V2(event_data, err_handler):
           format(collateralAsset_name, debtAsset_name, debtToCover,
                  liquidatedCollateralAmount, user, liquidator))
 
-    return {'received':[collateralAsset_name, liquidatedCollateralAmount], 'paid':[debtAsset_name, debtToCover], 'liquidator':liquidator}
+    return {'received':[collateralAsset_name, liquidatedCollateralAmount], 'paid':[debtAsset_name, debtToCover], 'liquidator':liquidator, 'user':user}
 
 '''Based on: https://github.com/aave/protocol-v2/blob/ice/mainnet-deployment-03-12-2020/contracts/interfaces/ILendingPool.sol
 '''
 def fetch_events(type):
     web3 = Web3(Web3.HTTPProvider(Infura_EndPoint))
     #from_block = 13333357 #2021-10-01 12:11:05
-    from_block = 13640492 - 4000
+    from_block = 13646063
     to_block = 'latest'
     address = None
     topics = None
@@ -158,6 +157,7 @@ def fetch_events(type):
     DebtAmountCovered = []
     ColAsset = []
     ColAmountCollected = []
+    User = []
     Block = []
     for entry in logs:
         data = dict(get_event_data(abi_codec, abi, entry))
@@ -194,6 +194,7 @@ def fetch_events(type):
                 '''Without Gas fee!'''
                 Balance.append(received - paid)
                 Liquidator.append(ret['liquidator'])
+                User.append(ret['user'])
                 Block.append(block_number)
             elif event_type == 'FlashLoan':
                 Transaction.append(transaction_hash)
@@ -202,6 +203,7 @@ def fetch_events(type):
     if type == 'LiquidationCall':
         df = pd.DataFrame({'transaction': Transaction,
                            'balance': Balance,
+                           'user': User,
                            'liquidator': Liquidator,
                            'col_asset': ColAsset,
                            'col_collected': ColAmountCollected,
@@ -212,8 +214,8 @@ def fetch_events(type):
     if type == 'FlashLoan':
         df = pd.DataFrame({'transaction': Transaction, 'block':Block})
 
-
-    df.to_csv('{}.csv'.format(type))
+    now = datetime.datetime.now()
+    df.to_csv('{}/{}_{}.csv'.format(CACHE_FOLDER, type, now.strftime("%Y%m%d_%H%M%S")))
 
     pass
 

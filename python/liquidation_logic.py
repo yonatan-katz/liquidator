@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import cache_events
 import datetime
+import datetime
+from config import CACHE_FOLDER
 import matplotlib.pyplot as plt
 
 
@@ -46,11 +48,13 @@ def main():
         Liquidated_reward.append(liquidated_reward)
 
     updated_not_healthy_accounts['liquidated_reward'] = Liquidated_reward
-    pass
-    updated_not_healthy_accounts = updated_not_healthy_accounts.set_index(updated_not_healthy_accounts.user).drop('user', axis=1)
 
+    now = datetime.datetime.now()
+    updated_not_healthy_accounts.to_hdf('{}/updated_not_healthy_accounts_{}.h5'.format(CACHE_FOLDER, now.strftime("%Y%m%d_%H%M%S")),key='account_health_data')
+    pass
+    '''
     healed_not_healthy_accounts = updated_not_healthy_accounts[updated_not_healthy_accounts.healthFactor > 1.0]
-    liquidated_not_healthy_accounts = set(liquidated_events.user).intersection(updated_not_healthy_accounts.user)
+    liquidated_not_healthy_accounts = set(liquidated_events.index).intersection(updated_not_healthy_accounts.index)
 
 
     print('borrowed accounts:{},not healthy:{}, healed:{}, liquidated:{}'.
@@ -60,18 +64,18 @@ def main():
                  len(healed_not_healthy_accounts),
                  len(liquidated_not_healthy_accounts)))
 
+    '''
     pass
 
 
 
-
-    '''For any account with health factor < 1.0
-       max reward in ETH is: (debt_eth*0.5) * bonus_factor 
-    '''
-
-
-
+def test():
+    fname = '{}/LiquidationCall_20211123_203253.csv'.format(CACHE_FOLDER,index_col=False)
+    lliq_evnt = pd.read_csv(fname)
+    fname='{}/updated_not_healthy_accounts_20211123_192440.h5'.format(CACHE_FOLDER)
+    df = pd.read_hdf(fname, key='account_health_data')
     pass
 
 if __name__ == '__main__':
-    main()
+    #main()
+    test()
