@@ -101,7 +101,7 @@ def convert_addr_in_crypto_asset(addr):
 
 def convert_crypto_asset_to_addr(name):
     if name in CRYPTO_ASSET_NAME_TO_ADDRESS:
-        return CRYPTO_ASSET_NAME_TO_ADDRESSp[name]
+        return CRYPTO_ASSET_NAME_TO_ADDRESS[name]
     else:
          raise Exception('Not known name:{}'.format(name))
 

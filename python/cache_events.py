@@ -68,7 +68,7 @@ def wrapper_getUserAccountData(user_address):
         ret = contract.functions.getUserAccountData(user).call()
         S['col'] = [ret[0] / 1e18]
         S['debt'] = ret[1] / 1e18
-        S['available'] = ret[2] / 1e18
+        S['availableBorrow'] = ret[2] / 1e18
         S['liquidation_threshold'] = ret[3] / 100.0
         S['ltv'] = ret[4] / 100.0
         S['healthFactor'] = ret[5] / 1e18
@@ -114,6 +114,31 @@ def wrapper_getConfiguration(reserve_to_index):
         c.append(df)
     c = pd.concat(c)
     return c
+
+'''18447685934079306374476'''
+def wrapper_getReserveData(reserve_to_index):
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
+    S = {}
+    c = []
+    for asset_addr in reserve_to_index:
+        ret = contract.functions.getReserveData(asset_addr).call()
+        print("asset:{}, config:{}".format(convert_addr_in_crypto_asset(asset_addr), ret[0][0]))
+        ltv, liq_threshold, liq_bonus, decimals = split_asset_config_bitmask(ret[0][0])
+        asset_name = convert_addr_in_crypto_asset(asset_addr)
+        S['name'] = [asset_name]
+        S['addr'] = [asset_addr]
+        S['ltv'] = [ltv]
+        S['liq_threshold'] = [liq_threshold]
+        S['liq_bonus'] = [liq_bonus]
+        S['decimals'] = [decimals]
+        S['variable_rate'] = ret[4]/1e27
+        S['stable_rate'] = ret[5] / 1e27
+        df = pd.DataFrame(S)
+        c.append(df)
+    c = pd.concat(c)
+    return c
+
 
 ''' Call getUserConfiguration, input args:
     @user AAVE protocol user address
@@ -245,7 +270,8 @@ def update_cache():
         for event_name in event_handlers.keys():
             event = getattr(contract.events, event_name)
             event_filter_params, abi, abi_codec = make_event_handler(event=event, from_block=b1, to_block=b2)
-            logs = contract.events.Borrow.web3.eth.getLogs(event_filter_params)
+            #logs = contract.events.Borrow.web3.eth.getLogs(event_filter_params)
+            logs = event.web3.eth.getLogs(event_filter_params)
             collected_events = []
             for entry in logs:
                 data = dict(get_event_data(abi_codec, abi, entry))
@@ -277,6 +303,7 @@ def update_cache():
 
 if __name__ == '__main__':
     #update_cache()
-    query_user_health_factor_from_cache()
+    #query_user_health_factor_from_cache()
+    wrapper_getReserveData(['0x6B175474E89094C44Da98b954EedeAC495271d0F'])
 
 
