@@ -3,6 +3,7 @@ Crypto assets addresses from:
 https://docs.aave.com/developers/v/1.0/deployed-contracts/deployed-contract-instances#reserves-assets
 '''
 CRYPTO_ASSET_ADDRESS_TO_NAME = {
+    '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB' : 'BTC',
     '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : 'ETH',
     '0x6B175474E89094C44Da98b954EedeAC495271d0F' : 'DAI',
     '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' : 'USDC',

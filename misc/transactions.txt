@@ -22,12 +22,57 @@ liquidator - 0xb2b3d5b6215D4fB23bF8dD642d385C4B44aADb2a
 0x2b353c44478f3b7166caa93374a47e6416e3997c6887ecc3c61dba7ec597a979 - 1
 
 Most rewarded transactions:
-0xc11b9e3bfe6b8edd4c364c714c4e2f71abc7c8f6a15a328b7e7d982aa75bfa06 - 414,940$, pos in block 0/42
+???? it looks like liquidation was triggered by different logic!
 0xb2631244afa7cee254470610f952d0ee5850fa832a707587c64d3815d1223062 - 207,490$, pos in block 0/120
-0xdb4f4fa5b6b65f7905639acd0c1d41b9723a476f2016426705200c655eb31da1 - 194,680$, pos in block 2/215
-0x4480d85ec4235b36250d091fbdc4a5335f5ee529f7a643d92ad033015c58af08 - 136,989$, pos in block 1/162
-0xd01402c15ffd8142b7598e4c4fb572b75592fec00c89bd17bfc382554724d160 - 94,766$  pos in block 1/168 #BUG!!!
-0x9559dbf768779351b9dbecbd23a2b28d5052901f33e71908ea8e6caa14b7913f - 94,766$ pos in block 0/168  #Duplicated transaction!!!!
+    Block:13521214
+    Chainlink aggregator: 0x46b77070f9256523c2F31c333b72C3E102f8A8A7 MANA/ETH
+    ChainLink update pos (1/215): 0x985b144dde3a0b6d3123605f3ffb18db3390821e55f85f8ddecebccacc366774
+    Block:13521213
+    Liquidation pos (2/215): 0xb2631244afa7cee254470610f952d0ee5850fa832a707587c64d3815d1223062
+
+
+------------------------------------------------------------------------------------------------------------------------
+Block:13521192
+    Chainlink aggregator: 0x46b77070f9256523c2F31c333b72C3E102f8A8A7 MANA/ETH
+    ChainLink update pos (115/369): 0x4a50fef8f6c5ce4b94228f7f01aded2b85549a04df4624d014af626ff8e73ab4
+Block:13521205
+    Liquidation pos (0/42): 0xc11b9e3bfe6b8edd4c364c714c4e2f71abc7c8f6a15a328b7e7d982aa75bfa06 - profit 141,000 USD
+
+------------------------------------------------------------------------------------------------------------------------
+Block:13393888
+    Chainlink aggregator: 0x7De0d6fce0C128395C488cb4Df667cdbfb35d7DE USDT/ETH
+    ChainLink update pos (1/215): 0x985b144dde3a0b6d3123605f3ffb18db3390821e55f85f8ddecebccacc366774
+    Liquidation pos (2/215): 0xdb4f4fa5b6b65f7905639acd0c1d41b9723a476f2016426705200c655eb31da1 - profit ~160,000 USD
+
+------------------------------------------------------------------------------------------------------------------------
+Block: 13437568
+ Chainlink aggregator: 0xe5BbBdb2Bb953371841318E1Edfbf727447CeF2E
+ ChainLink update pos(0/162): 0x26287b76b0cca4feff01bf8298089640cfb7ce5c3b19c318e6488d834c81b1f9 USDC/ETH
+ Liquidation pos(1/162): 0x4480d85ec4235b36250d091fbdc4a5335f5ee529f7a643d92ad033015c58af08 - profit ~100,000 USD
+
+------------------------------------------------------------------------------------------------------------------------
+Block:13521192
+    Chainlink aggregator: 0x46b77070f9256523c2F31c333b72C3E102f8A8A7 MANA/ETH
+    ChainLink update pos(115/369): 0x4a50fef8f6c5ce4b94228f7f01aded2b85549a04df4624d014af626ff8e73ab4
+Block:13521194
+    Liquidation split events:
+    pos: (0/168)0x9559dbf768779351b9dbecbd23a2b28d5052901f33e71908ea8e6caa14b7913f - 94,766 USD
+    pos: (1/168)0xd01402c15ffd8142b7598e4c4fb572b75592fec00c89bd17bfc382554724d160 - 94,766 USD
+------------------------------------------------------------------------------------------------------------------------
+
+Block:13562915
+    Chainlink aggregator: 0x46b77070f9256523c2F31c333b72C3E102f8A8A7 USDC/ETH
+    ChainLink update pos(91/313): 0xe96a5ad03b46dd1589126ce7749a0d127a37228a94696075436105f44e076689
+Block: 13562916
+    Liquidation pos(7/213): 0x2a0aabd99fbfcdeaeed171213de205564bc801e8be55d8bb1e4190c16b01b350 profit about 400 USD
+------------------------------------------------------------------------------------------------------------------------
+
+Block:13562896
+    Chainlink aggregator: 0x158228e08C52F3e2211Ccbc8ec275FA93f6033FC DAI/ETH
+    ChainLink update pos(5/96): 0x2525a0ab4cc1f46b175a46a18849cf86d5b69e45c723175ad36f13db55d2f193
+    Liquidation pos(6/96): 0xd0440616f676b1f459a9ec26d8ac848966a23430a86f3aa0e9049c31798a9d45 profit about 1500 USD
+------------------------------------------------------------------------------------------------------------------------
+
 
 https://etherscan.io/address/0x3909336de913344701c6f096502d26208210b39f - liqiudation bot! Liqiudate small positions on AAve and Compound!
 

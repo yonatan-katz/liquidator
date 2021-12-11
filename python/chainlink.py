@@ -2,6 +2,7 @@ import config
 import pandas as pd
 import numpy as np
 from web3 import Web3
+from ens import ENS
 from web3._utils.filters import construct_event_filter_params
 '''Update rule:
     https://docs.chain.link/docs/faq/
@@ -17,9 +18,6 @@ from web3._utils.filters import construct_event_filter_params
 '''
 CHAIN_LINK_ADDR = {
     'ETH': {'USD': Web3.toChecksumAddress('0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419')},
-    'DAI': {'ETH':'0x773616E4d11A78F511299002da57A0a94577F1f4'},
-    'USDT': {'ETH':'0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46'},
-    'USDC': {'ETH': '0x986b5E1e1755e3C2440e960477f25201B0a8bbD4'}
 }
 
 CHAIN_LINK_FEED_REG_ADDR = "0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf"
@@ -27,6 +25,24 @@ CHAIN_LINK_FEED_REG_ABI='[{"anonymous":false,"inputs":[{"indexed":true,"internal
 CHAIN_LINK_ABI = '[{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"description","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint80","name":"_roundId","type":"uint80"}],"name":"getRoundData","outputs":[{"internalType":"uint80","name":"roundId","type":"uint80"},{"internalType":"int256","name":"answer","type":"int256"},{"internalType":"uint256","name":"startedAt","type":"uint256"},{"internalType":"uint256","name":"updatedAt","type":"uint256"},{"internalType":"uint80","name":"answeredInRound","type":"uint80"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"latestRoundData","outputs":[{"internalType":"uint80","name":"roundId","type":"uint80"},{"internalType":"int256","name":"answer","type":"int256"},{"internalType":"uint256","name":"startedAt","type":"uint256"},{"internalType":"uint256","name":"updatedAt","type":"uint256"},{"internalType":"uint80","name":"answeredInRound","type":"uint80"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"version","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]'
 '''See here: https://github.com/smartcontractkit/chainlink/blob/master/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol
 '''
+
+def get_feed_address(from_asset,to_asset):
+
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    ns = ENS.fromWeb3(web3)
+    ens = "{}-{}.data.eth".format(from_asset.lower(), to_asset.lower())
+    address = ns.address(ens)
+    if address is not None:
+        return True, address
+    else:
+        """Try inverse"""
+        inv_ens = "{}-{}.data.eth".format(to_asset.lower(), from_asset.lower())
+        inv_address = ns.address(inv_ens)
+        if inv_address is not None:
+            return False, inv_address
+
+    return None, None
+
 
 def get_contract_addr_from_local_reg(base, quote):
     return CHAIN_LINK_ADDR[base][quote]

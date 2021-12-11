@@ -42,7 +42,7 @@ def get_latest_block_meta():
     latest_block_meta = web3.eth.get_block('latest')
     return latest_block_meta
 
-def load_from_cache():
+def load_events_from_cache():
     cached_block_to_fname = {}
     for fname in glob.glob('{}/cached_events_*.bin'.format(CACHE_FOLDER)):
         block = int(fname.split('_')[-1].split('.')[0])
@@ -194,10 +194,7 @@ def query_liquidation_call_event(from_block, to_block='latest'):
 
 
 
-def query_user_health_factor_from_cache():
-    cached_data, last_cached_block = load_from_cache()
-    borrow  = cached_data['Borrow']
-    user_address = borrow.user.unique()
+def query_user_health_factor_and_cache(user_address, last_cached_block):
     web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
     contract = web3.eth.contract(address=config.Lending_Pool_V2_Address,
                                  abi=config.Lending_Pool_V2_ABI)
@@ -209,13 +206,17 @@ def query_user_health_factor_from_cache():
         S['col'] = [ret[0]/1e18]
         S['debt'] = [ret[1]/1e18]
         S['available'] = [ret[2]/1e18]
-        S['liquidation_threshold'] = [ret[3] / 100.0]
-        S['ltv'] = [ret[4] / 100.0]
-        S['healthFactor'] = [ret[5] / 1e18]
+        S['liquidation_threshold'] = [ret[3]/100.0]
+        S['ltv'] = [ret[4]/100.0]
+        S['healthFactor'] = [ret[5]/1e18]
         S['user'] = [user]
 
         df = pd.DataFrame(S)
         user_account.append(df)
+
+        if len(user_account) % 100 == 0:
+            print('Collected health factor for {}/{} users'.format(len(user_account),len(user_address)))
+
     t2 = datetime.datetime.now()
     print('time:{}'.format((t2 - t1).total_seconds()))
     user_account = pd.concat(user_account)
@@ -249,7 +250,7 @@ def update_cache():
     event_handlers = {'Borrow': aave_events.handle_borrow,
                       'Repay': aave_events.handle_repay,
                       'Swap':  aave_events.handle_swap}
-    event_cache, from_block = load_from_cache()
+    event_cache, from_block = load_events_from_cache()
     if from_block is None:
         from_block = 11363357 #Dec-01-2020 12:17:34
         event_cache = {}
