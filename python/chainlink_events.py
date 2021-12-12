@@ -247,13 +247,31 @@ def test2():
 def test3():
     fname = "{}/liq_events_latency.csv".format('C:/Users/yonic/junk/liquidator/cache')
     df = pd.read_csv(fname, index_col=False)
+    tx = '0xb8962849cb82425248d1e3af10718439d15b71504031856af16d3dabef70c932'
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    Gas_payed = []
+    for n, g in df.iterrows():
+        tx = g.tx
+        tx_receipt = web3.eth.wait_for_transaction_receipt(tx)
+        gas_payed = tx_receipt['gasUsed'] * tx_receipt['effectiveGasPrice'] / 10 ** 18
+        Gas_payed.append(gas_payed)
+    df['gas_payed'] = Gas_payed
+    fname = "{}/liq_events_latency_with_gas.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    df.to_csv(fname)
     pass
+
+def test4():
+    fname = "{}/liq_events_latency_with_gas.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    df = pd.read_csv(fname, index_col=False)
+    pass
+
 
 
 
 if __name__ == '__main__':
     #test2()
-    test3()
+    #test3()
+    test4()
 
 
 
