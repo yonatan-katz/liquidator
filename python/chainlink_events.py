@@ -1,10 +1,13 @@
 import config
+from config import CACHE_FOLDER
 import pandas as pd
 import numpy as np
 import pickle
 import json
 import chainlink
 import aave_events
+import cache_events
+import bot_v1
 from web3 import Web3
 from ens import ENS
 import matplotlib.pyplot as plt
@@ -16,6 +19,8 @@ AccessControlledOffchainAggregator_ABI='[{"inputs":[{"internalType":"uint32","na
 
 '''ETH/USD aggregator address'''
 AccessControlledOffchainAggregator_Address ='0x37bC7498f4FF12C19678ee8fE19d713b87F6a9e6'
+
+ETH_addr = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 
 def make_event_handler(event, from_block, to_block):
     abi = event._get_event_abi()
@@ -119,6 +124,7 @@ def test1():
     event_block = 13562896
     query_chainlink_event(aggregator_addr=aggregator, from_block=event_block-15, to_block=event_block+1)
 
+
 def test2():
 
     def find_pair_aggregator(base, quote):
@@ -148,28 +154,56 @@ def test2():
         else:
             return amount / ratio
 
+    reserve_list, reserve_config = bot_v1.load_reserve_from_cache()
+    def reserve_name_to_add(name):
+        return reserve_config[reserve_config.name == name].addr.values[0]
 
+    def find_chainlink_update_block(asset_addr, from_block, to_block):
+        if asset_addr == '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2':
+            asset_addr = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+
+        if asset_addr == '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599':
+            asset_addr = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+
+        if asset_addr != ETH_addr:
+            direct, aggregator = find_pair_aggregator(base=asset_addr, quote=ETH_addr)
+
+            if aggregator is not None:
+                block, _ = query_chainlink_event(aggregator_addr=aggregator,from_block=from_block,to_block=to_block)
+                return block
+            else:
+                return None
 
 
     #liq_events = query_aave_liquidation_event(from_block=13393888, to_block='latest')
     #liq_events.to_csv("{}/liq_events_for_test.csv".format('C:/Users/yonic/junk/liquidator/cache'))
-    liq_events = pd.read_csv("{}/liq_events_for_test.csv".format('C:/Users/yonic/junk/liquidator/cache'),
+    liq_events = pd.read_csv("{}/liq_events_for_test.csv".format(CACHE_FOLDER),
                              index_col=False)
 
     blocks_diff = []
     missed_index = []
-    ETH_addr = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
     Profit = []
     Blocks = []
     Tx = []
 
     for n, g in liq_events.iterrows():
         print(n)
+        collateral, borrowed = cache_events.wrapper_getUserConfiguration(g.user, reserve_list)
+        C = []
+        B = []
+        for c in collateral:
+            C.append(reserve_name_to_add(c))
+        for b in borrowed:
+            B.append(reserve_name_to_add(b))
+
         col_addr = g.collateralAsset
         debt_addr = g.debtAsset
         liq_block = g.block_number
         debt_to_eth_price = None
         col_to_eth_price = None
+
+        more_col_assets = list(set(C).difference([col_addr]))
+        more_debt_assets = list(set(B).difference([debt_addr]))
 
         """chainlink uses ETH instead of WETH"""
         if col_addr == '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2':
@@ -203,12 +237,12 @@ def test2():
         if debt_to_eth[1] is not None:
             chainlink_link_debt_block, debt_to_eth_price = query_chainlink_event(aggregator_addr=debt_to_eth[1],
                                                                                  from_block=liq_block-1600,
-                                                                                 to_block=liq_block+1)
+                                                                                 to_block=liq_block)
 
         if col_to_eth[1] is not None:
             chainlink_link_col_block, col_to_eth_price = query_chainlink_event(aggregator_addr=col_to_eth[1],
                                                                                from_block=liq_block-1600,
-                                                                               to_block=liq_block+1)
+                                                                               to_block=liq_block)
 
         chainlink_link_latest_block = None
         if chainlink_link_debt_block is not None and chainlink_link_col_block is not None:
@@ -218,7 +252,18 @@ def test2():
         elif chainlink_link_col_block is not None:
             chainlink_link_latest_block = chainlink_link_col_block
 
+
         if chainlink_link_latest_block is not None:
+            for col_asset in more_col_assets:
+                b = find_chainlink_update_block(asset_addr=col_asset, from_block=liq_block - 1600, to_block=liq_block)
+                if b is not None:
+                    chainlink_link_latest_block = max(chainlink_link_latest_block, b)
+
+            for debt_asset in more_debt_assets:
+                b = find_chainlink_update_block(asset_addr=debt_asset, from_block=liq_block - 1600, to_block=liq_block)
+                if b is not None:
+                    chainlink_link_latest_block = max(chainlink_link_latest_block, b)
+
             blocks_diff.append(liq_block - chainlink_link_latest_block)
 
             debt_decimals = chainlink.get_decimals(g.debtAsset)
@@ -240,12 +285,12 @@ def test2():
 
 
     df = pd.DataFrame({'profit':Profit, 'blocks_from_oracle_update':Blocks, 'tx':Tx})
-    fname = "{}/liq_events_latency.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    fname = "{}/liq_events_latency_multi_leg.csv".format(CACHE_FOLDER)
     df.to_csv(fname)
     pass
 
 def test3():
-    fname = "{}/liq_events_latency.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    fname = "{}/liq_events_latency_multi_leg.csv".format(CACHE_FOLDER)
     df = pd.read_csv(fname, index_col=False)
     tx = '0xb8962849cb82425248d1e3af10718439d15b71504031856af16d3dabef70c932'
     web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
@@ -256,12 +301,15 @@ def test3():
         gas_payed = tx_receipt['gasUsed'] * tx_receipt['effectiveGasPrice'] / 10 ** 18
         Gas_payed.append(gas_payed)
     df['gas_payed'] = Gas_payed
-    fname = "{}/liq_events_latency_with_gas.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    fname = "{}/liq_events_latency_multi_leg_with_gas.csv".format(CACHE_FOLDER)
     df.to_csv(fname)
     pass
 
 def test4():
-    fname = "{}/liq_events_latency_with_gas.csv".format('C:/Users/yonic/junk/liquidator/cache')
+    fname = "{}/liq_events_latency_multi_leg_with_gas.csv".format(CACHE_FOLDER)
+    df_multi = pd.read_csv(fname, index_col=False)
+
+    fname = "{}/liq_events_latency_with_gas.csv".format(CACHE_FOLDER)
     df = pd.read_csv(fname, index_col=False)
     pass
 
