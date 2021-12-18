@@ -1,0 +1,16 @@
+{
+  "name": "client",
+  "version": "1.0.0",
+  "description": "js client - ethers via infura",
+  "main": "infura.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aave/protocol-js": "^4.3.0",
+    "@aave/protocol-v2": "^1.0.1",
+    "ethers": "^5.5.2"
+  }
+}
