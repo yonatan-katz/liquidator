@@ -1,0 +1,28 @@
+[
+  {
+    "account": "0xc65ee4f20226fF0f7AA546a368036E640c57D3BE",
+    "collateralAssets": [
+      "WETH",
+      "USDT"
+    ],
+    "debtAssets": [
+      "USDT",
+      "WBTC"
+    ],
+    "totalDebtETH": 0.6,
+    "healthFactor": 1.1
+  },
+  {
+    "account": "0xc65ee4f20226fF0f7AA546a368036E640c57D3BExx",
+    "collateralAssets": [
+      "WETH",
+      "USDT"
+    ],
+    "debtAssets": [
+      "USDT",
+      "WBTC"
+    ],
+    "totalDebtETH": 0.6,
+    "healthFactor": 1.1
+  }
+]
