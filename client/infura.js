@@ -24,14 +24,24 @@ const chainlink_aggregator_address =
 //const projectId = "fd3ac79f46ba4500be8e92da9632b476"; //Yonatan
 const projectId = "474dfacad06547a4aba817b93fa852c9";
 
-async function main() {
-  const tstamp = () => new Date(Date.now()).toISOString();
+const tstamp = () => new Date(Date.now()).toISOString();
 
-  console.log("%s running infura client", tstamp());
-  provider = ethers.providers.InfuraProvider.getWebSocketProvider(
-    "homestead",
-    projectId
-  );
+const toPrice = (big_number, coin_pair) => {
+    if(coin_pair.includes("/USD")) {
+	const denom = 1e8;
+	return ethers.BigNumber.from(big_number).toNumber()/ denom;
+    }
+    return ethers.utils.formatEther(big_number.toString());
+};
+
+
+async function main() {
+    
+    console.log("%s running infura client", tstamp());
+    provider = ethers.providers.InfuraProvider.getWebSocketProvider(
+	"homestead",
+	projectId
+    );
 
   block_number = await provider.getBlockNumber();
   console.log("%s connected to infura, last block %d", tstamp(), block_number);
@@ -111,11 +121,11 @@ async function main() {
       symbol_map[config["symbolHash"]] = symbol;
 
       const price = await price_feed_contract.price(symbol);
-      console.log("%s, %s price:", tstamp(), symbol, price.toNumber() / 1e6);
+      console.log("%s, %s/USD price: %s", tstamp(), symbol, price.toNumber() / 1e6);
     }
   }
 
-  console.log(symbol_map);
+  //console.log(symbol_map);
 
   //Query events in previous blocks
   /* const evts = await price_feed_contract.queryFilter(
@@ -133,40 +143,33 @@ async function main() {
    *   );
    * } */
 
-  //
-  //Chainlink price oracles
-  //
-  const chainlink_oracles = {};
-  for (const [contract, coin] of Object.entries(chainlink.price_oracles)) {
+    
+    //
+    //Chainlink price oracles
+    //
+    const chainlink_oracles = {};
+  for (const [contract, coin_pair] of Object.entries(chainlink.price_oracles)) {
     const oracle = new ethers.Contract(contract, abi.chainlink_abi, provider);
 
     oracle.on("AnswerUpdated", (...evt) => {
-      var price = evt[0];
-
-      try {
-        price = ethers.BigNumber.from(evt[0]).toNumber() / 1e8;
-      } catch (error) {
-        //console.log(error);
-        //console.log(evt);
-        price += "(failed conversion)";
-      }
-
+      var price = toPrice(evt[0], coin_pair);
       console.log(
         "%s %s chainlink price update %s %f",
         tstamp(),
         evt[3]["blockNumber"],
-        coin,
+        coin_pair,
         price
       );
     });
 
-    chainlink_oracles[coin] = oracle;
+    chainlink_oracles[coin_pair] = oracle;
 
+    const latest_answer = await oracle.latestAnswer();
     console.log(
-      "%s registering chainlink price oracle %s %s",
-      tstamp(),
-      coin,
-      chainlink_oracles[coin].address
+	"%s registering chainlink price oracle %s %s",
+	tstamp(),
+	coin_pair,
+	toPrice(latest_answer, coin_pair)
     );
   }
 
@@ -213,7 +216,7 @@ async function main() {
     const symbol = symbol_map[evt[0]];
     if (typeof symbol !== "undefined") {
       console.log(
-        "%s %d uniswap update  - price %s $%f",
+        "%s %d uniswap update  - price %s/USD %f",
         tstamp(),
         evt[2]["blockNumber"],
         symbol,
