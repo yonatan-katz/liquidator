@@ -21,8 +21,14 @@ const chainlink_aggregator_address_eth_usd =
 //const projectId = "fd3ac79f46ba4500be8e92da9632b476"; //Yonatan
 const projectId = "474dfacad06547a4aba817b93fa852c9";
 
+//
+// Timestamp signature
+//
 const tstamp = () => new Date(Date.now()).toISOString();
 
+//
+// Conversion from BigNumber to floating point values
+//
 const toPrice = (big_number, coin_pair) => {
   if (coin_pair.includes("/USD")) {
     const denom = 1e8;
@@ -31,13 +37,20 @@ const toPrice = (big_number, coin_pair) => {
   return ethers.utils.formatEther(big_number.toString());
 };
 
+//
+//Load accounts from json file
+//
 const loadAccounts = (json_file) => {
   console.log("loading tracked accounts from %s", json_file);
   var accounts = require(json_file);
 
   console.log("tracked accounts:");
   for (account of accounts) {
-    account.health = 0;
+    account.health_factor = 0;
+    account.totalCollateralETH = 0;
+    account.totalDebtETH = 0;
+    account.currentLiquidationThreshold = 0;
+
     console.log(
       "%s collateral:%s debt:%s",
       account.account,
@@ -50,15 +63,33 @@ const loadAccounts = (json_file) => {
 };
 
 //
+//Locally calculated health factor
+//
+const hFactor = (account) => {
+  return (
+    (account.totalCollateralETH * account.currentLiquidationThreshold) /
+    account.totalDebtETH
+  );
+};
+
+//
 //Fetch account health
 //
 const fetchAccountState = async (account, aave_lending_pool_contract) => {
-  var prev_hfactor = account.health;
   const account_data = await aave_lending_pool_contract.getUserAccountData(
     account.account
   );
 
-  var current_hfactor = account_data["healthFactor"] / 1e18;
+  var prev_health_factor = account.health_factor;
+
+  account.health_factor = ethers.utils.formatEther(account_data.healthFactor);
+  account.totalCollateralETH = ethers.utils.formatEther(
+    account_data.totalCollateralETH
+  );
+  account.totalDebtETH = ethers.utils.formatEther(account_data.totalDebtETH);
+  account.currentLiquidationThreshold =
+    ethers.BigNumber.from(account_data.currentLiquidationThreshold).toNumber() /
+    1e4;
 
   console.log(
     "%s %s health factor: %s %s %s (%f)",
@@ -66,11 +97,9 @@ const fetchAccountState = async (account, aave_lending_pool_contract) => {
     account.account,
     account.collateralAssets,
     account.debtAssets,
-    current_hfactor,
-    current_hfactor - prev_hfactor
+    account.health_factor,
+    account.health_factor - prev_health_factor
   );
-
-  account.health = current_hfactor;
 };
 
 //
@@ -102,7 +131,7 @@ const fetchAccountsStateByCoinPair = async (
 //
 const topNAccounts = (accounts, N) => {
   accounts.sort((a, b) => {
-    return a.health - b.health;
+    return a.health_factor - b.health_factor;
   });
 
   return accounts.slice(0, N);
