@@ -56,6 +56,10 @@ def split_user_loan_deposit_bitmask(bitmask):
         is_col = int(bitmask_ascii[i-1])
         S[asset_index] = (is_col, is_borrowed)
         asset_index += 1
+
+    if i-1 == 3:
+        is_borrowed = int(bitmask_ascii[2])
+        S[asset_index] = (0, is_borrowed)
     return S
 
 

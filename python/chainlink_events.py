@@ -125,7 +125,7 @@ def test1():
     query_chainlink_event(aggregator_addr=aggregator, from_block=event_block-15, to_block=event_block+1)
 
 
-def test2():
+def query_historic_event_meta(from_block):
 
     def find_pair_aggregator(base, quote):
         try:
@@ -177,8 +177,9 @@ def test2():
 
     #liq_events = query_aave_liquidation_event(from_block=13393888, to_block='latest')
     #liq_events.to_csv("{}/liq_events_for_test.csv".format('C:/Users/yonic/junk/liquidator/cache'))
-    liq_events = pd.read_csv("{}/liq_events_for_test.csv".format(CACHE_FOLDER),
-                             index_col=False)
+    #liq_events = pd.read_csv("{}/liq_events_for_test.csv".format(CACHE_FOLDER),  index_col=False)
+
+    liq_events = pd.read_csv('/home/yonic/junk/liq_events_{}.csv'.format(from_block))
 
     blocks_diff = []
     missed_index = []
@@ -282,10 +283,18 @@ def test2():
         else:
             missed_index.append(n)
 
+    df = pd.DataFrame({'profit': Profit, 'blocks_from_oracle_update': Blocks, 'tx': Tx})
 
-
-    df = pd.DataFrame({'profit':Profit, 'blocks_from_oracle_update':Blocks, 'tx':Tx})
-    fname = "{}/liq_events_latency_multi_leg.csv".format(CACHE_FOLDER)
+    web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
+    Gas_payed = []
+    for n, g in df.iterrows():
+        tx = g.tx
+        tx_receipt = web3.eth.wait_for_transaction_receipt(tx)
+        gas_payed = tx_receipt['gasUsed'] * tx_receipt['effectiveGasPrice'] / 10 ** 18
+        Gas_payed.append(gas_payed)
+    df['gas_payed'] = Gas_payed
+    df['reward'] = df.profit - df.gas_payed
+    fname = "/home/yonic/junk/liq_events_profit_{}.csv".format(from_block)
     df.to_csv(fname)
     pass
 
@@ -317,9 +326,9 @@ def test4():
 
 
 if __name__ == '__main__':
-    #test2()
+    test2()
     #test3()
-    test4()
+    #test4()
 
 
 

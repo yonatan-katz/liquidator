@@ -7,6 +7,7 @@ import datetime
 import chainlink
 import config
 import pickle
+import json
 from config import CACHE_FOLDER
 from  reserve_asset import convert_crypto_asset_to_addr
 
@@ -51,12 +52,51 @@ def check_and_cache_user_health_factor():
     cache_events.query_user_health_factor_and_cache(user_address=all_user_acounts, last_cached_block=last_cached_block)
     pass
 
-def get_users_for_monitor(threshold=1.1):
+def get_users_for_monitor(threshold=1.06):
+    deciamls = chainlink.get_decimals(address=chainlink.CHAIN_LINK_ADDR['ETH']['USD'])
+    _, eth_to_usd_price, _, _, _ = chainlink.get_price(address=chainlink.CHAIN_LINK_ADDR['ETH']['USD'], decimals=deciamls)
     """Read latest user cached health factor data"""
     cached_borrowed_accounts, from_cached_block, date, time_of_cache = cache_events.load_latest_health_factor_from_cache()
     I = (cached_borrowed_accounts.healthFactor < threshold) & (cached_borrowed_accounts.healthFactor > 1.0)
     cached_borrowed_accounts = cached_borrowed_accounts[I]
+    debt_in_usd = cached_borrowed_accounts.debt * eth_to_usd_price
+    I = debt_in_usd > 1500
+    cached_borrowed_accounts = cached_borrowed_accounts[I]
     return list(cached_borrowed_accounts.user)
+
+def asset_to_chainlink_aggregator(asset, quote=chainlink.ETH_addr):
+    if asset == '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2':
+        asset = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+
+    if asset == '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599':
+        asset = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+
+
+    if asset != quote:
+        direct, aggregator = chainlink.find_pair_aggregator(base=asset, quote=quote)
+        return direct, aggregator
+    else:
+        return None, None
+
+"""Comvert AAVE reserve to chainlink aggregator pair(AAVE reserve to ETH_
+"""
+def update_chainlink_aggregators(date):
+    reserve_list, reserve_config = load_reserve_from_cache()
+    A = []
+    D = []
+    Dec = []
+    N = []
+    for r in reserve_list:
+        if r != '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE':
+            direct, aggregator = asset_to_chainlink_aggregator(asset=r)
+            if direct is not None:
+                decimals = chainlink.get_decimals_from_aggregator(aggregator)
+                A.append(aggregator)
+                D.append(int(direct))
+                Dec.append(decimals)
+                N.append(reserve_config[reserve_config.addr==r].name.values[0])
+    df = pd.DataFrame({'aggregator':A, 'id_direct':D, 'name':N, 'decimals' : decimals})
+    df.to_csv('~/junk/chainlink_aggregator_to_eth_{}.csv'.format(date))
 
 def get_chainlink_ratio_from_eth(chainlink_feed_config, to_asset):
     is_direct, address, decimals = chainlink_feed_config[to_asset]
@@ -65,6 +105,26 @@ def get_chainlink_ratio_from_eth(chainlink_feed_config, to_asset):
         return price
     else:
         return 1.0 / price
+
+def get_user_config_short(users, date):
+    reserve_list, reserve_config = load_reserve_from_cache()
+    U = []
+    B = []
+    C = []
+    for user in users:
+        collateral_type, borrowed_type = cache_events.wrapper_getUserConfiguration(user=user, reserve_to_index=reserve_list)
+        assets_involved = set(collateral_type).union(borrowed_type)
+        D1 = assets_involved.difference(['USDC', 'USDT'])
+        D2 = assets_involved.difference(['USDC', 'DAI'])
+        D3 = assets_involved.difference(['USDT', 'DAI'])
+        if collateral_type != borrowed_type and len(D1) > 0 and len(D2) > 0 and len(D3) > 0:
+            U.append(user)
+            C.append(collateral_type)
+            B.append(borrowed_type)
+
+    df = pd.DataFrame({'user':U, 'collateral':C,'borrow':B})
+    df.to_csv("~/junk/account_for_monitor_asset_type_{}.csv".format(date))
+    pass
 
 
 def get_user_config(users):
@@ -142,18 +202,56 @@ def get_user_config(users):
 
     return df, chainlink_feed_config
 
+def test():
+    user = '0x361f31EEBa9086494b94ba17c2E0a555c7F45F4c'
+    chainlink_aggregators = pd.read_csv('{}/chainlink_aggregator_to_eth_{}.csv'.format(config.CACHE_FOLDER))
+    reserve_list, reserve_config = load_reserve_from_cache()
+    account_data = cache_events.wrapper_getUserAccountData([user])
+    collateral_type, borrowed_type = cache_events.wrapper_getUserConfiguration(user=user, reserve_to_index=reserve_list)
+    for c in collateral_type:
+        aggregator = chainlink_aggregators[chainlink_aggregators.name == collateral_type[0]].aggregator.values[0]
+        id_direct = chainlink_aggregators[chainlink_aggregators.name == collateral_type[0]].id_direct.values[0]
+        round_id, price, started_at, timestamp, answered_in_round = chainlink.get_price_from_aggregator(aggregator)
+        pass
+    pass
+
+def make_json_summary(date):
+    df_aggregator_meta = pd.read_csv('~/junk/chainlink_aggregator_to_eth_{}.csv'.format(date).format(config.CACHE_FOLDER))
+    S = []
+    for n, a in df_aggregator_meta.iterrows():
+        asset_name = a.iloc[3]
+        s = {'{}/ETH'.format(asset_name):{'aggregator':a.aggregator, 'id_direct':a.id_direct, 'decimals':a.decimals}}
+        S.append(s)
+
+    json.dump(S, open('/home/yonic/junk/chainlink_aggregator_meta_{}.json'.format(date), 'w'), indent=4)
+
+    df_users = pd.read_csv("~/junk/account_for_monitor_asset_type_{}.csv".format(date))
+    S = []
+    for n, u in df_users.iterrows():
+        s = {"account":u.user, "collateralAssets":u.collateral,"debtAssets":u.borrow}
+        S.append(s)
+    json.dump(S, open('/home/yonic/junk/user_for_monitor_{}.json'.format(date),'w'), indent = 4)
+
+
+    pass
 
 
 def main():
-    #update_cache_reserve_config()
+    now = datetime.datetime.now()
+    date = now.strftime("%Y%m%d")
+    update_cache_reserve_config()
     """snapshot of the health factor for all active users"""
-    #update_cached_events()
-    #check_and_cache_user_health_factor()
+    update_cached_events() #snapshot for borrow events!
+    check_and_cache_user_health_factor() #snapshot for all active accounts!
     """monitor most likely liquidable users"""
     users = get_users_for_monitor()
-    user_config,chainlink_feed_config  = get_user_config(users)
+    get_user_config_short(users, date)
+    ###user_config,chainlink_feed_config  = get_user_config(users)
+    update_chainlink_aggregators(date)
+    make_json_summary(date)
     pass
 
 
 if __name__ == '__main__':
     main()
+    #test()

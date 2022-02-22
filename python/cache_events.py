@@ -153,15 +153,16 @@ def wrapper_getUserConfiguration(user, reserve_to_index):
     web3 = Web3(Web3.HTTPProvider(config.Infura_EndPoint))
     contract = web3.eth.contract(address=config.Lending_Pool_V2_Address, abi=config.Lending_Pool_V2_ABI)
     ret = contract.functions.getUserConfiguration(user).call()
-    s = split_user_loan_deposit_bitmask(ret[0])
-    for k in s.keys():
-        is_col, is_borrowed = s[k]
-        asset_addr = reserve_to_index[k]
-        asset_name = convert_addr_in_crypto_asset(asset_addr)
-        if is_col:
-            collateral.append(asset_name)
-        if is_borrowed:
-            borrowed.append(asset_name)
+    if ret[0] > 0:
+        s = split_user_loan_deposit_bitmask(ret[0])
+        for k in s.keys():
+            is_col, is_borrowed = s[k]
+            asset_addr = reserve_to_index[k]
+            asset_name = convert_addr_in_crypto_asset(asset_addr)
+            if is_col:
+                collateral.append(asset_name)
+            if is_borrowed:
+                borrowed.append(asset_name)
 
     return collateral, borrowed
 
