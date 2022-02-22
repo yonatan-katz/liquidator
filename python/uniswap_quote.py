@@ -18,21 +18,26 @@ dai = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
 
 def main():
     usdc_to_eth = []
-    eth_to_usdc = []
+
+    eth_1_to_usdc = []
+    eth_10_to_usdc = []
+    eth_100_to_usdc = []
 
     for i in range(100):
-        # Returns the amount of USDC you get for 1 ETH (10^18 wei)
-        rate = uniswap.get_price_input(eth, usdc, 10 ** 18) / 1e6
-        print("1 ETH to USDC rate: {}".format(rate))
-        usdc_to_eth.append(rate)
+        # Returns the amount of USDC you get for 1 ETH
+        rate = uniswap.get_price_input(eth, usdc, 1*10**18, fee=0.3) / 1e6
+        eth_1_to_usdc.append(rate)
 
-        # Returns the amount of ETH you need to pay (in wei) to get 1 USDC
-        rate = uniswap.get_price_output(eth, dai, 1 * 10 ** 6) / 1e6
-        print("1 USDC to 1 ETH rate:{}".format(rate))
-        eth_to_usdc.append(rate)
+        # Returns the amount of USDC you get for 10 ETH
+        rate = uniswap.get_price_input(eth, usdc, 10 * 10 ** 18, fee=0.3) / 1e6
+        eth_10_to_usdc.append(rate)
+
+        # Returns the amount of USDC you get for 100 ETH
+        rate = uniswap.get_price_input(eth, usdc, 100 * 10 ** 18, fee=0.3) / 1e6
+        eth_100_to_usdc.append(rate)
         time.sleep(1)
 
-    df = pd.DataFrame({"usdc_to_eth":usdc_to_eth, "eth_to_usdc":eth_to_usdc})
+    df = pd.DataFrame({"eth_1_to_usdc":eth_1_to_usdc, "eth_10_to_usdc":eth_10_to_usdc, "eth_100_to_usdc":eth_100_to_usdc})
     pass
 
 if __name__ == "__main__":
